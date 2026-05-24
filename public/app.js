@@ -2,6 +2,7 @@ const state = {
   games: [],
   standings: [],
   playersCount: 0,
+  storage: null,
   admin: false,
   adminData: null,
   participantName: "",
@@ -119,7 +120,9 @@ async function refreshAll() {
   state.games = data.games;
   state.standings = data.standings;
   state.playersCount = data.playersCount;
+  state.storage = data.storage;
   renderHeroStats();
+  renderStorageStatus();
   if (!document.querySelector("#entryForm").classList.contains("hidden")) {
     renderPredictionsForm(readPredictionDraft());
   }
@@ -540,6 +543,16 @@ function formatDate(value) {
 function renderHeroStats() {
   document.querySelector("#gameCount").textContent = state.games.length;
   document.querySelector("#playerCount").textContent = state.playersCount;
+}
+
+function renderStorageStatus() {
+  const status = document.querySelector("#storageStatus");
+  if (!status || !state.storage) return;
+  status.className = `storage-status wide ${state.storage.persistent ? "ok" : "warning"}`;
+  status.innerHTML = `
+    <strong>Dados: ${escapeHtml(state.storage.mode)}</strong>
+    <span>${escapeHtml(state.storage.message)}</span>
+  `;
 }
 
 function gameMeta(game) {
