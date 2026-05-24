@@ -6,6 +6,9 @@ const crypto = require("crypto");
 const PORT = Number(process.env.PORT || 3000);
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "";
+const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_FILE = process.env.DB_FILE || path.join(DATA_DIR, "db.json");
 const SEED_GAMES_FILE = path.join(__dirname, "data", "seed-games.json");
@@ -30,12 +33,24 @@ const mimeTypes = {
 };
 
 async function ensureDb() {
+  if (USE_SUPABASE) {
+    await readSupabaseDb();
+    return;
+  }
   await fs.mkdir(DATA_DIR, { recursive: true });
   try {
     await fs.access(DB_FILE);
   } catch {
     await writeDb(await initialDb());
   }
+}
+
+function normalizeDb(db) {
+  return {
+    games: Array.isArray(db.games) ? db.games : [],
+    players: Array.isArray(db.players) ? db.players : [],
+    predictions: Array.isArray(db.predictions) ? db.predictions : []
+  };
 }
 
 async function initialDb() {
@@ -52,21 +67,69 @@ async function initialDb() {
 }
 
 async function readDb() {
+  if (USE_SUPABASE) {
+    return readSupabaseDb();
+  }
   await ensureDb();
   const raw = await fs.readFile(DB_FILE, "utf8");
-  const db = JSON.parse(raw);
-  return {
-    games: Array.isArray(db.games) ? db.games : [],
-    players: Array.isArray(db.players) ? db.players : [],
-    predictions: Array.isArray(db.predictions) ? db.predictions : []
-  };
+  return normalizeDb(JSON.parse(raw));
 }
 
 async function writeDb(db) {
+  if (USE_SUPABASE) {
+    await writeSupabaseDb(db);
+    return;
+  }
   await fs.mkdir(DATA_DIR, { recursive: true });
   const tmp = `${DB_FILE}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(db, null, 2));
   await fs.rename(tmp, DB_FILE);
+}
+
+function supabaseHeaders(extra = {}) {
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    "Content-Type": "application/json",
+    ...extra
+  };
+}
+
+async function supabaseFetch(pathname, options = {}) {
+  const baseUrl = SUPABASE_URL.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/rest/v1${pathname}`, {
+    ...options,
+    headers: supabaseHeaders(options.headers || {})
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Erro no Supabase: ${response.status} ${text}`);
+  }
+  return response;
+}
+
+async function readSupabaseDb() {
+  const response = await supabaseFetch("/app_state?id=eq.main&select=data");
+  const rows = await response.json();
+  if (rows[0] && rows[0].data) {
+    return normalizeDb(rows[0].data);
+  }
+  const db = await initialDb();
+  await writeSupabaseDb(db);
+  return db;
+}
+
+async function writeSupabaseDb(db) {
+  await supabaseFetch("/app_state?on_conflict=id", {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify({
+      id: "main",
+      data: normalizeDb(db)
+    })
+  });
 }
 
 function sendJson(res, status, payload) {
@@ -209,10 +272,26 @@ function publicState(db) {
     games: db.games.map(publicGame).sort(sortGames),
     standings: buildStandings(db),
     playersCount: db.players.length,
+    storage: storageInfo(),
     scoring: {
       exact: 5,
       outcome: 3
     }
+  };
+}
+
+function storageInfo() {
+  if (USE_SUPABASE) {
+    return {
+      mode: "Supabase",
+      persistent: true,
+      message: "Os dados estao sendo salvos no Supabase."
+    };
+  }
+  return {
+    mode: "Arquivo local",
+    persistent: Boolean(process.env.DATA_DIR || process.env.DB_FILE),
+    message: "Os dados estao sendo salvos em arquivo local. Em hospedagem gratuita, eles podem sumir quando o app reiniciar."
   };
 }
 

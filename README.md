@@ -80,6 +80,66 @@ Os dados ficam no arquivo `data/db.json`, criado automaticamente na primeira exe
 
 Este projeto pode ser publicado como reposititorio no GitHub. GitHub Pages nao serve para este app, porque ele precisa de um servidor Node.js e de um lugar persistente para salvar os palpites.
 
+### Opcao gratuita: Render Free + Supabase Free
+
+Essa e a melhor opcao sem pagar:
+
+- Render Free roda o servidor Node.js.
+- Supabase Free salva os dados em Postgres.
+
+No Supabase:
+
+1. Crie uma conta em `https://supabase.com`.
+2. Crie um projeto novo.
+3. Abra **SQL Editor**.
+4. Rode este SQL:
+
+```sql
+create table if not exists public.app_state (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+```
+
+5. Abra **Project Settings > API**.
+6. Copie:
+   - `Project URL`
+   - `service_role` ou `secret` key
+
+No Render:
+
+1. Crie um **Web Service** conectado ao repositorio do GitHub.
+2. Escolha o plano **Free**.
+3. Configure:
+
+```text
+Runtime: Node
+Build Command: npm install
+Start Command: npm start
+```
+
+4. Em **Environment Variables**, adicione:
+
+```text
+SUPABASE_URL=cole_a_project_url_do_supabase
+SUPABASE_SERVICE_ROLE_KEY=cole_a_service_role_ou_secret_key
+ADMIN_USER=seu_usuario
+ADMIN_PASSWORD=sua_senha_forte
+```
+
+Exemplo correto de `SUPABASE_URL`:
+
+```text
+https://seu-projeto.supabase.co
+```
+
+Nao precisa colocar `/rest/v1` no final.
+
+Importante: nunca coloque a `SUPABASE_SERVICE_ROLE_KEY` no codigo nem no navegador. Ela deve ficar apenas nas variaveis secretas do Render.
+
+Quando essas variaveis existem, o app usa o Supabase. Quando nao existem, ele continua usando `data/db.json` localmente.
+
 ### Opcao simples: Render com disco persistente
 
 1. Suba o projeto para um repositorio no GitHub.
