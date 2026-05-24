@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bolao da Copa</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Bolao da Copa</p>
+        <h1>Palpites, tabela e jogo ao vivo</h1>
+        <p class="hero-copy">Entre pelo nome, preencha seus palpites e acompanhe a disputa rodada por rodada.</p>
+        <div class="hero-stats" aria-label="Resumo do bolao">
+          <span><strong id="gameCount">0</strong> jogos</span>
+          <span><strong id="playerCount">0</strong> participantes</span>
+          <span><strong>5</strong> pontos no placar exato</span>
+        </div>
+      </div>
+      <button class="ghost-button" data-view-button="admin">Admin</button>
+    </header>
+
+    <nav class="tabs" aria-label="Navegacao principal">
+      <button class="tab active" data-view-button="participate">Participar</button>
+      <button class="tab" data-view-button="standings">Tabela</button>
+      <button class="tab" data-view-button="live">Jogo ao vivo</button>
+    </nav>
+
+    <main class="shell">
+      <section id="alert" class="alert hidden" role="status"></section>
+
+      <section id="participate" class="view active">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Entrada por nome</p>
+            <h2>Participar do bolao</h2>
+          </div>
+          <p class="hint">Digite seu nome. Se voce ja entrou, seus palpites aparecem travados; se nao entrou, todos os jogos ficam liberados para preencher.</p>
+        </div>
+
+        <form id="nameForm" class="panel participant-name">
+          <label class="field">
+            <span>Nome do participante</span>
+            <input id="playerName" name="playerName" autocomplete="name" placeholder="Seu nome" required>
+          </label>
+          <button class="primary-button" type="submit">Continuar</button>
+        </form>
+
+        <form id="entryForm" class="panel hidden">
+          <div class="panel-title">
+            <div>
+              <h3 id="entryTitle">Preencher todos os palpites</h3>
+              <p class="hint">Depois do envio, somente o administrador consegue alterar.</p>
+            </div>
+            <button class="ghost-button switch-player" type="button">Trocar nome</button>
+          </div>
+          <div id="predictionList" class="match-list"></div>
+          <button class="primary-button" type="submit">Enviar palpites</button>
+        </form>
+
+        <div id="playerDashboard" class="panel hidden">
+          <div class="panel-title">
+            <div>
+              <h3 id="playerDashboardTitle">Meus palpites</h3>
+              <p class="hint">Se precisar corrigir alguma coisa, fale com o administrador.</p>
+            </div>
+            <button class="ghost-button switch-player" type="button">Trocar nome</button>
+          </div>
+          <div class="table-wrap flat-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Jogo</th>
+                  <th>Meu palpite</th>
+                  <th>Resultado</th>
+                  <th>Pontos</th>
+                </tr>
+              </thead>
+              <tbody id="playerPredictionsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="standings" class="view">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Classificacao</p>
+            <h2>Tabela do bolao</h2>
+          </div>
+          <p class="hint">Placar exato: 5 pontos. Acerto do vencedor ou empate: 3 pontos.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Participante</th>
+                <th>Pontos</th>
+                <th>Exatos</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody id="standingsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="live" class="view">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Transmissao</p>
+            <h2>Palpites do jogo</h2>
+          </div>
+          <select id="liveGameSelect" aria-label="Escolher jogo"></select>
+        </div>
+        <div id="liveScoreboard" class="scoreboard"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Participante</th>
+                <th>Palpite</th>
+                <th>Pontos agora</th>
+              </tr>
+            </thead>
+            <tbody id="livePredictionsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="admin" class="view">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Area restrita</p>
+            <h2>Administracao</h2>
+          </div>
+          <button id="logoutButton" class="ghost-button hidden" type="button">Sair</button>
+        </div>
+
+        <form id="loginForm" class="panel admin-login">
+          <label class="field">
+            <span>Usuario</span>
+            <input id="adminUser" autocomplete="username" value="admin" required>
+          </label>
+          <label class="field">
+            <span>Senha</span>
+            <input id="adminPassword" type="password" autocomplete="current-password" placeholder="admin123" required>
+          </label>
+          <button class="primary-button" type="submit">Entrar</button>
+        </form>
+
+        <div id="adminPanel" class="admin-grid hidden">
+          <section class="panel">
+            <div class="panel-title">
+              <h3>Cadastrar jogo</h3>
+            </div>
+            <form id="gameForm" class="game-form">
+              <input name="stage" placeholder="Fase" value="Fase de grupos">
+              <input name="group" placeholder="Grupo">
+              <input name="startsAt" type="datetime-local">
+              <input name="homeTeam" placeholder="Mandante" required>
+              <input name="awayTeam" placeholder="Visitante" required>
+              <input name="venue" placeholder="Cidade / sede">
+              <button class="primary-button" type="submit">Adicionar</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-title">
+              <h3>Importar varios jogos</h3>
+            </div>
+            <textarea id="csvImport" rows="5" placeholder="Fase;Grupo;2026-06-11T16:00;Brasil;Mexico"></textarea>
+            <button id="importButton" class="secondary-button" type="button">Importar CSV</button>
+          </section>
+
+          <section class="panel wide">
+            <div class="panel-title">
+              <h3>Jogos e resultados</h3>
+              <button id="refreshButton" class="ghost-button" type="button">Atualizar</button>
+            </div>
+            <div id="adminGames" class="admin-list"></div>
+          </section>
+
+          <section class="panel wide">
+            <div class="panel-title">
+              <h3>Participantes</h3>
+            </div>
+            <div id="adminPlayers" class="admin-list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

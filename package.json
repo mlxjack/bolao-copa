@@ -1,0 +1,19 @@
+{
+  "name": "bolao-da-copa",
+  "version": "1.0.0",
+  "description": "Aplicativo simples para bolao da Copa com palpites travados, administracao e tabela de pontos.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "bolao",
+    "copa",
+    "node"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
