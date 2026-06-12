@@ -102,7 +102,10 @@ function showView(name) {
   views.forEach((view) => view.classList.toggle("active", view.id === name));
   navButtons.forEach((button) => button.classList.toggle("active", button.dataset.viewButton === name));
   if (name === "admin") checkAdmin();
-  if (name === "live") renderLiveGame();
+  if (name === "live") {
+    selectPreferredLiveGame();
+    renderLiveGame();
+  }
 }
 
 async function api(path, options = {}) {
@@ -164,12 +167,12 @@ function renderStandings() {
     return;
   }
   body.innerHTML = state.standings.map((player, index) => `
-    <tr>
-      <td><span class="rank rank-${index + 1}">${index + 1}</span></td>
-      <td><strong>${escapeHtml(player.name)}</strong></td>
-      <td><strong>${player.points}</strong></td>
-      <td>${player.exact}</td>
-      <td>${player.outcome}</td>
+    <tr class="${index === 0 ? "standings-leader" : ""}">
+      <td data-label="Posicao"><span class="rank rank-${index + 1}">${index + 1}</span></td>
+      <td data-label="Participante"><strong class="participant-name-cell">${escapeHtml(player.name)}</strong>${index === 0 ? '<span class="leader-label">Lider</span>' : ""}</td>
+      <td data-label="Pontos"><strong class="points-total">${player.points}</strong></td>
+      <td data-label="Placares exatos">${player.exact}</td>
+      <td data-label="Resultados">${player.outcome}</td>
     </tr>
   `).join("");
 }
@@ -181,6 +184,12 @@ function renderLiveSelector() {
     <option value="${game.id}">${flagCode(game.homeTeam)} ${escapeHtml(game.homeTeam)} x ${flagCode(game.awayTeam)} ${escapeHtml(game.awayTeam)} - ${labels[game.status] || ""}</option>
   `).join("");
   if (state.games.some((game) => game.id === current)) select.value = current;
+}
+
+function selectPreferredLiveGame() {
+  const select = document.querySelector("#liveGameSelect");
+  const liveGame = state.games.find((game) => game.status === "live");
+  if (liveGame) select.value = liveGame.id;
 }
 
 async function renderLiveGame() {
@@ -198,28 +207,45 @@ async function renderLiveGame() {
   const data = await api(`/api/games/${gameId}/predictions`);
   const game = data.game;
   const score = game.homeScore === null || game.awayScore === null ? "- x -" : `${game.homeScore} x ${game.awayScore}`;
+  const homeLeading = Number(game.homeScore) > Number(game.awayScore);
+  const awayLeading = Number(game.awayScore) > Number(game.homeScore);
   scoreboard.innerHTML = `
-    <div class="score-team">${teamLabel(game.homeTeam, "large")}</div>
-    <div>
+    <div class="score-team ${homeLeading ? "winning" : ""}">${teamLabel(game.homeTeam, "large")}</div>
+    <div class="score-center">
+      <span class="score-stage">${escapeHtml(game.group ? `Grupo ${game.group}` : game.stage || "")}</span>
       <div class="score-number">${score}</div>
       <span class="badge ${game.status}">${labels[game.status]}</span>
     </div>
-    <div class="score-team">${teamLabel(game.awayTeam, "large")}</div>
+    <div class="score-team ${awayLeading ? "winning" : ""}">${teamLabel(game.awayTeam, "large")}</div>
   `;
 
+  const summary = document.querySelector("#liveSummary");
   if (data.hidden) {
+    summary.innerHTML = "";
     body.innerHTML = `<tr><td colspan="3" class="empty">Os palpites aparecem quando o administrador marcar o jogo como ao vivo ou finalizado.</td></tr>`;
     return;
   }
   if (data.predictions.length === 0) {
+    summary.innerHTML = "";
     body.innerHTML = `<tr><td colspan="3" class="empty">Ainda nao ha palpites para esse jogo.</td></tr>`;
     return;
   }
-  body.innerHTML = data.predictions.map((prediction) => `
-    <tr>
-      <td><strong>${escapeHtml(prediction.playerName)}</strong></td>
-      <td>${prediction.homeScore} x ${prediction.awayScore}</td>
-      <td><strong>${prediction.pointsNow}</strong></td>
+  const predictions = [...data.predictions].sort((a, b) =>
+    b.pointsNow - a.pointsNow || a.playerName.localeCompare(b.playerName, "pt-BR")
+  );
+  const bestPoints = predictions[0]?.pointsNow || 0;
+  const leaders = predictions.filter((prediction) => prediction.pointsNow === bestPoints);
+  summary.innerHTML = `
+    <div><strong>${leaders.length}</strong><span>${leaders.length === 1 ? "lider nesta partida" : "lideres nesta partida"}</span></div>
+    <div><strong>${bestPoints}</strong><span>maior pontuacao agora</span></div>
+    <div><strong>${predictions.filter((prediction) => prediction.pointsNow > 0).length}</strong><span>pontuando agora</span></div>
+  `;
+  body.innerHTML = predictions.map((prediction, index) => `
+    <tr class="${prediction.pointsNow === bestPoints && bestPoints > 0 ? "live-leader" : ""}">
+      <td data-label="Posicao"><span class="rank rank-${index + 1}">${index + 1}</span></td>
+      <td data-label="Participante"><strong>${escapeHtml(prediction.playerName)}</strong>${prediction.pointsNow === bestPoints && bestPoints > 0 ? '<span class="leader-label">Na frente</span>' : ""}</td>
+      <td data-label="Palpite"><span class="prediction-score">${prediction.homeScore} x ${prediction.awayScore}</span></td>
+      <td data-label="Pontos agora"><strong class="live-points ${prediction.pointsNow > 0 ? "scoring" : ""}">${prediction.pointsNow}</strong></td>
     </tr>
   `).join("");
 }
@@ -303,14 +329,14 @@ function renderPlayerPredictions(player) {
     const result = game.homeScore === null || game.awayScore === null ? "Aguardando" : `${game.homeScore} x ${game.awayScore}`;
     const prediction = entry.homeScore === null || entry.awayScore === null ? "Nao preenchido" : `${entry.homeScore} x ${entry.awayScore}`;
     return `
-      <tr>
-        <td>
+      <tr class="${entry.pointsNow > 0 ? "prediction-scored" : ""}">
+        <td data-label="Jogo">
           <strong>${teamsLine(game)}</strong>
           <div class="match-meta">${gameMeta(game)}</div>
         </td>
-        <td>${prediction}</td>
-        <td><span class="badge ${game.status}">${result}</span></td>
-        <td><strong>${entry.pointsNow}</strong></td>
+        <td data-label="Meu palpite"><span class="prediction-score">${prediction}</span></td>
+        <td data-label="Resultado"><span class="result-score ${game.status}">${result}</span></td>
+        <td data-label="Pontos"><strong class="live-points ${entry.pointsNow > 0 ? "scoring" : ""}">${entry.pointsNow}</strong></td>
       </tr>
     `;
   }).join("");
