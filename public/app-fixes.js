@@ -162,6 +162,16 @@ function renderAdminPlayers() {
 
 async function loadAdminData() {
   const playersContainer = document.querySelector("#adminPlayers");
+  const isEditingPlayer = Boolean(
+    playersContainer?.querySelector(".player-row[open]") ||
+    playersContainer?.contains(document.activeElement)
+  );
+
+  if (isEditingPlayer && state.adminData) {
+    renderAdminGames();
+    return;
+  }
+
   try {
     if (playersContainer) {
       playersContainer.innerHTML = '<div class="empty">Carregando participantes...</div>';
