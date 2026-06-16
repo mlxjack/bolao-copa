@@ -1,4 +1,8 @@
 // Complementos de seguranca e usabilidade carregados depois do aplicativo principal.
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
 function readPredictionDraft() {
   return Object.fromEntries([...document.querySelectorAll("#predictionList .match-row")].map((row) => [
     row.dataset.gameId,
