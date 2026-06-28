@@ -13,6 +13,57 @@ function readPredictionDraft() {
   ]));
 }
 
+function renderStandings() {
+  const body = document.querySelector("#standingsBody");
+  if (state.standings.length === 0) {
+    body.innerHTML = '<tr><td colspan="5" class="empty">Nenhum participante entrou no bolao ainda.</td></tr>';
+    return;
+  }
+
+  const currentName = state.currentPlayer?.name || localStorage.getItem("bolaoPlayerName") || "";
+  const groups = [];
+
+  state.standings.forEach((player) => {
+    const previous = groups.at(-1);
+    if (previous && previous.points === player.points && previous.exact === player.exact) {
+      previous.players.push(player);
+    } else {
+      groups.push({ points: player.points, exact: player.exact, players: [player] });
+    }
+  });
+
+  body.innerHTML = groups.map((group, index) => {
+    const position = index + 1;
+    const members = group.players.map((player) => {
+      const isCurrent = player.name.toLocaleLowerCase("pt-BR") === currentName.toLocaleLowerCase("pt-BR");
+      return `
+        <div class="standing-member ${isCurrent ? "current-player-row" : ""}">
+          <div class="standing-member-name">
+            <strong>${escapeHtml(player.name)}</strong>
+            ${isCurrent ? '<span class="you-label">Você</span>' : ""}
+          </div>
+          <div class="standing-stat"><span>Pontos</span><strong class="points-total">${player.points}</strong></div>
+          <div class="standing-stat"><span>Placares exatos</span><strong>${player.exact}</strong></div>
+          <div class="standing-stat"><span>Resultados</span><strong>${player.outcome}</strong></div>
+        </div>`;
+    }).join("");
+
+    return `
+      <tr class="standings-group-row ${position === 1 ? "standings-leader" : ""}">
+        <td colspan="5">
+          <section class="standing-group">
+            <header class="standing-group-rank">
+              <span class="rank rank-${position}">${position}</span>
+              <span>${position === 1 ? "Liderança" : `${position}º lugar`}</span>
+              ${group.players.length > 1 ? `<strong>${group.players.length} empatados</strong>` : ""}
+            </header>
+            <div class="standing-members">${members}</div>
+          </section>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
 function renderAdminPlayers() {
   const container = document.querySelector("#adminPlayers");
   const data = state.adminData;
@@ -169,6 +220,7 @@ async function loadAdminData() {
 
   if (isEditingPlayer && state.adminData) {
     renderAdminGames();
+    renderPredictionVisibilityControl();
     return;
   }
 
@@ -178,6 +230,7 @@ async function loadAdminData() {
     }
     state.adminData = await api("/api/admin/players");
     renderAdminGames();
+    renderPredictionVisibilityControl();
     renderAdminPlayers();
   } catch (error) {
     state.adminData = null;
@@ -192,4 +245,51 @@ async function loadAdminData() {
     }
     showAlert(error.message, "error");
   }
+}
+
+function renderPredictionVisibilityControl() {
+  const panel = document.querySelector("#adminPanel");
+  if (!panel || !state.adminData) return;
+
+  let control = document.querySelector("#predictionVisibilityControl");
+  if (!control) {
+    control = document.createElement("section");
+    control.id = "predictionVisibilityControl";
+    control.className = "panel wide prediction-visibility-panel";
+    const storageStatus = document.querySelector("#storageStatus");
+    storageStatus?.insertAdjacentElement("afterend", control);
+  }
+
+  const visible = Boolean(state.adminData.settings?.predictionsVisible);
+  control.innerHTML = `
+    <div class="panel-title">
+      <div>
+        <h3>Palpites públicos</h3>
+        <p class="hint">${visible
+          ? "Os palpites de todos estao visiveis no Jogo ao vivo."
+          : "Os palpites de todos estao escondidos do publico."}</p>
+      </div>
+      <button id="togglePredictionVisibility" class="${visible ? "danger-button" : "primary-button"}" type="button">
+        ${visible ? "Bloquear palpites" : "Liberar palpites"}
+      </button>
+    </div>
+    <div class="visibility-status ${visible ? "released" : "locked"}">
+      <strong>${visible ? "Liberado" : "Bloqueado"}</strong>
+      <span>${visible
+        ? "Participantes conseguem ver os palpites de todos os jogos."
+        : "Participantes nao veem os palpites dos outros ate voce liberar."}</span>
+    </div>`;
+
+  control.querySelector("#togglePredictionVisibility").addEventListener("click", async () => {
+    try {
+      await api("/api/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ predictionsVisible: !visible }),
+      });
+      showAlert(!visible ? "Palpites liberados para todos." : "Palpites bloqueados para o publico.", "success");
+      await refreshAll();
+    } catch (error) {
+      showAlert(error.message, "error");
+    }
+  });
 }
