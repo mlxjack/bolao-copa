@@ -19,7 +19,10 @@ const sessions = new Map();
 const defaultDb = {
   games: [],
   players: [],
-  predictions: []
+  predictions: [],
+  settings: {
+    predictionsVisible: false
+  }
 };
 
 const mimeTypes = {
@@ -49,7 +52,11 @@ function normalizeDb(db) {
   return {
     games: Array.isArray(db.games) ? db.games : [],
     players: Array.isArray(db.players) ? db.players : [],
-    predictions: Array.isArray(db.predictions) ? db.predictions : []
+    predictions: Array.isArray(db.predictions) ? db.predictions : [],
+    settings: {
+      ...defaultDb.settings,
+      ...(db && typeof db.settings === "object" ? db.settings : {})
+    }
   };
 }
 
@@ -273,6 +280,9 @@ function publicState(db) {
     standings: buildStandings(db),
     playersCount: db.players.length,
     storage: storageInfo(),
+    settings: {
+      predictionsVisible: Boolean(db.settings?.predictionsVisible)
+    },
     scoring: {
       exact: 5,
       outcome: 3
@@ -367,6 +377,10 @@ async function handleApi(req, res, url) {
     const game = db.games.find((item) => item.id === gameId);
     if (!game) {
       sendError(res, 404, "Jogo nao encontrado.");
+      return;
+    }
+    if (!db.settings?.predictionsVisible) {
+      sendJson(res, 200, { game: publicGame(game), predictions: [], hidden: true });
       return;
     }
     const predictions = db.predictions
@@ -551,8 +565,24 @@ async function handleApi(req, res, url) {
       sendJson(res, 200, {
         players: db.players,
         predictions: db.predictions,
-        games: db.games.map(publicGame).sort(sortGames)
+        games: db.games.map(publicGame).sort(sortGames),
+        settings: {
+          predictionsVisible: Boolean(db.settings?.predictionsVisible)
+        }
       });
+      return;
+    }
+
+    if (method === "PATCH" && url.pathname === "/api/admin/settings") {
+      const payload = await readBody(req);
+      const db = await readDb();
+      db.settings = {
+        ...defaultDb.settings,
+        ...(db.settings || {}),
+        predictionsVisible: Boolean(payload.predictionsVisible)
+      };
+      await writeDb(db);
+      sendJson(res, 200, { ok: true, settings: db.settings, state: publicState(db) });
       return;
     }
 
